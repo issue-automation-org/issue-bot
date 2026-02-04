@@ -10,18 +10,7 @@ permissions:
 jobs:
   respond-to-assign-request:
     runs-on: ubuntu-latest
-    if: >-
-      github.event.issue.pull_request == null &&
-      (
-      contains(toLower(github.event.comment.body), 'assign this issue to me') ||
-      contains(toLower(github.event.comment.body), 'assign me') ||
-      contains(toLower(github.event.comment.body), 'can i work on this') ||
-      contains(toLower(github.event.comment.body), 'can i work here') ||
-      contains(toLower(github.event.comment.body), 'i would like to work on this') ||
-      contains(toLower(github.event.comment.body), 'i want to work on this') ||
-      contains(toLower(github.event.comment.body), 'please assign this to me') ||
-      contains(toLower(github.event.comment.body), 'can you assign this to me')
-      )
+    if: github.event.issue.pull_request == null
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
