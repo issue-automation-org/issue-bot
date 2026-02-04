@@ -1,6 +1,6 @@
 name: Issue Assignment Bot
 
-"on":
+on:
   issue_comment:
     types: [created]
 
@@ -10,31 +10,30 @@ permissions:
 jobs:
   respond-to-assign-request:
     runs-on: ubuntu-latest
-    if: |
+    if: >-
       github.event.issue.pull_request == null &&
       (
-        contains(toLower(github.event.comment.body), 'assign this issue to me') ||
-        contains(toLower(github.event.comment.body), 'assign me') ||
-        contains(toLower(github.event.comment.body), 'can i work on this') ||
-        contains(toLower(github.event.comment.body), 'can i work here') ||
-        contains(toLower(github.event.comment.body), 'i would like to work on this') ||
-        contains(toLower(github.event.comment.body), 'i want to work on this') ||
-        contains(toLower(github.event.comment.body), 'please assign this to me') ||
-        contains(toLower(github.event.comment.body), 'can you assign this to me')
+      contains(toLower(github.event.comment.body), 'assign this issue to me') ||
+      contains(toLower(github.event.comment.body), 'assign me') ||
+      contains(toLower(github.event.comment.body), 'can i work on this') ||
+      contains(toLower(github.event.comment.body), 'can i work here') ||
+      contains(toLower(github.event.comment.body), 'i would like to work on this') ||
+      contains(toLower(github.event.comment.body), 'i want to work on this') ||
+      contains(toLower(github.event.comment.body), 'please assign this to me') ||
+      contains(toLower(github.event.comment.body), 'can you assign this to me')
       )
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.9'
-          
+
       - name: Install dependencies
-        run: |
-          pip install -r requirements.txt
-          
+        run: pip install -r requirements.txt
+
       - name: Run issue assignment bot
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
