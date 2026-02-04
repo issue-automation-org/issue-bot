@@ -1,0 +1,34 @@
+name: PR Issue Auto-Assignment
+
+on:
+  pull_request_target:
+    types: [opened, reopened]
+
+permissions:
+  issues: write
+  pull-requests: read
+
+jobs:
+  auto-assign-issue:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.9'
+          
+      - name: Install dependencies
+        run: |
+          pip install -e .[github_actions]
+          
+      - name: Run issue assignment bot
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPOSITORY: ${{ github.repository }}
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+        run: |
+          echo '${{ toJson(github.event) }}' > event.json
+          python -m openwisp_utils.issue_assignment_bot event.json
