@@ -66,6 +66,24 @@ class IssueAssignmentBot:
 
         try:
             contributing_url = self.get_contributing_guidelines_url()
+            issue = self.repo.get_issue(issue_number)
+            
+            # Detect issue type based on labels
+            issue_labels = [label.name.lower() for label in issue.labels]
+            suggested_keyword = None
+            
+            if any(label in issue_labels for label in ['bug', 'bugfix', 'fix']):
+                suggested_keyword = 'Fixes'
+            elif any(label in issue_labels for label in ['feature', 'enhancement', 'change', 'improvement']):
+                suggested_keyword = 'Closes'
+            
+            # Build the linking instruction
+            if suggested_keyword:
+                linking_instruction = f"**Link your PR to this issue** by including `{suggested_keyword} #{issue_number}` in the PR description"
+                keyword_explanation = f"\n\n**Note**: We suggest `{suggested_keyword}` because this appears to be a {('bug' if suggested_keyword == 'Fixes' else 'feature/change')}. You can also use:\n- `Closes #{issue_number}` for features/changes\n- `Fixes #{issue_number}` for bugs\n- `Related to #{issue_number}` for PRs that contribute but don't completely solve the issue"
+            else:
+                linking_instruction = f"**Link your PR to this issue** by including one of the following in the PR description:\n   - `Closes #{issue_number}` for features/changes\n   - `Fixes #{issue_number}` for bugs\n   - `Related to #{issue_number}` for PRs that contribute but don't completely solve the issue"
+                keyword_explanation = ""
             
             message = f"""Hi @{commenter} 👋,
 
@@ -75,7 +93,7 @@ According to our [contributing guidelines]({contributing_url}), **you don't need
 
 1. **Fork the repository** and start working on your solution
 2. **Open a Pull Request (PR) as soon as possible** - even as a draft if it's still in progress
-3. **Link your PR to this issue** by including `Fixes #{issue_number}` in the PR description
+3. {linking_instruction}{keyword_explanation}
 
 Once you open a PR that references this issue, you will be automatically assigned to it.
 
@@ -88,7 +106,6 @@ We look forward to your contribution! If you have any questions, feel free to as
 
 Happy coding! 🚀"""
 
-            issue = self.repo.get_issue(issue_number)
             issue.create_comment(message)
             print(f"Posted assignment response to issue #{issue_number}")
             return True
@@ -100,7 +117,8 @@ Happy coding! 🚀"""
         """Extract issue numbers from PR body"""
         if not pr_body:
             return []
-        issue_pattern = r'(?:fix(?:es)?|close[sd]?|resolve[sd]?)\s+#(\d+)'
+        # Updated pattern to include "Related to"
+        issue_pattern = r'(?:fix(?:es)?|close[sd]?|resolve[sd]?|related to)\s+#(\d+)'
         matches = re.findall(issue_pattern, pr_body, re.IGNORECASE)
         return list(set(int(match) for match in matches))
 
