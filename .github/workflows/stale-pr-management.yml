@@ -1,4 +1,4 @@
-name: Stale PR Management (Python)
+name: Stale PR Management
 
 on:
   schedule:
