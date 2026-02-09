@@ -28,6 +28,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPOSITORY: ${{ github.repository }}
           GITHUB_EVENT_NAME: ${{ github.event_name }}
+          EVENT_DATA: ${{ toJson(github.event) }}
         run: |
-          echo '${{ toJson(github.event) }}' > event.json
+          echo "$EVENT_DATA" > event.json
           python -m openwisp_utils.issue_assignment_bot event.json
