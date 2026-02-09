@@ -58,6 +58,49 @@ class IssueAssignmentBot:
         """Get the contributing guidelines URL for the repository"""
         return 'https://openwisp.io/docs/developer/contributing.html'
 
+    def detect_issue_type(self, issue):
+        """
+        Intelligently detect issue type by analyzing labels, title, and body.
+        Returns: 'bug', 'feature', or None
+        """
+        # Bug-related keywords
+        bug_keywords = [
+            'bug', 'error', 'crash', 'fail', 'broken', 'issue', 'problem',
+            'not working', 'doesn\'t work', 'does not work', 'fix', 'incorrect',
+            'wrong', 'exception', 'traceback', 'breaking', 'regression'
+        ]
+        
+        # Feature-related keywords
+        feature_keywords = [
+            'feature', 'enhancement', 'add', 'implement', 'support', 'new',
+            'create', 'allow', 'enable', 'improve', 'improvement', 'upgrade',
+            'extend', 'functionality', 'capability', 'ability', 'option'
+        ]
+        
+        # Check labels first (highest priority)
+        issue_labels = [label.name.lower() for label in issue.labels]
+        if any(label in issue_labels for label in ['bug', 'bugfix', 'fix']):
+            return 'bug'
+        elif any(label in issue_labels for label in ['feature', 'enhancement', 'improvement']):
+            return 'feature'
+        
+        # Analyze title and body content
+        title = (issue.title or '').lower()
+        body = (issue.body or '').lower()
+        combined_text = f"{title} {body}"
+        
+        # Count keyword matches
+        bug_score = sum(1 for keyword in bug_keywords if keyword in combined_text)
+        feature_score = sum(1 for keyword in feature_keywords if keyword in combined_text)
+        
+        # Determine type based on scores
+        if bug_score > feature_score and bug_score > 0:
+            return 'bug'
+        elif feature_score > bug_score and feature_score > 0:
+            return 'feature'
+        
+        return None
+
     def respond_to_assignment_request(self, issue_number, commenter):
         """Respond to assignment request with contributing guidelines"""
         if not self.repo:
@@ -68,19 +111,22 @@ class IssueAssignmentBot:
             contributing_url = self.get_contributing_guidelines_url()
             issue = self.repo.get_issue(issue_number)
             
-            # Detect issue type based on labels
-            issue_labels = [label.name.lower() for label in issue.labels]
+            # Intelligently detect issue type using labels, title, and body
+            issue_type = self.detect_issue_type(issue)
             suggested_keyword = None
+            detection_reason = ""
             
-            if any(label in issue_labels for label in ['bug', 'bugfix', 'fix']):
+            if issue_type == 'bug':
                 suggested_keyword = 'Fixes'
-            elif any(label in issue_labels for label in ['feature', 'enhancement', 'change', 'improvement']):
+                detection_reason = "this appears to be a bug"
+            elif issue_type == 'feature':
                 suggested_keyword = 'Closes'
+                detection_reason = "this appears to be a feature or enhancement"
             
             # Build the linking instruction
             if suggested_keyword:
                 linking_instruction = f"**Link your PR to this issue** by including `{suggested_keyword} #{issue_number}` in the PR description"
-                keyword_explanation = f"\n\n**Note**: We suggest `{suggested_keyword}` because this appears to be a {('bug' if suggested_keyword == 'Fixes' else 'feature/change')}. You can also use:\n- `Closes #{issue_number}` for features/changes\n- `Fixes #{issue_number}` for bugs\n- `Related to #{issue_number}` for PRs that contribute but don't completely solve the issue"
+                keyword_explanation = f"\n\n**Note**: We suggest `{suggested_keyword}` because {detection_reason}. You can also use:\n- `Closes #{issue_number}` for features/changes\n- `Fixes #{issue_number}` for bugs\n- `Related to #{issue_number}` for PRs that contribute but don't completely solve the issue"
             else:
                 linking_instruction = f"**Link your PR to this issue** by including one of the following in the PR description:\n   - `Closes #{issue_number}` for features/changes\n   - `Fixes #{issue_number}` for bugs\n   - `Related to #{issue_number}` for PRs that contribute but don't completely solve the issue"
                 keyword_explanation = ""
