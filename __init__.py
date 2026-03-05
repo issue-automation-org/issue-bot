@@ -1,1 +1,0 @@
-# OpenWISP Utils placeholder for test repository
