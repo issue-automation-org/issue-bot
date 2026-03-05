@@ -16,11 +16,8 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request_target' && github.event.action == 'reopened'
     steps:
-      - name: Checkout openwisp-utils
+      - name: Checkout repository
         uses: actions/checkout@v6
-        with:
-          repository: Eeshu-Yadav/openwisp-utils
-          ref: issues/571-automate-assigning-unassigning-issues
 
       - name: Set up Python
         uses: actions/setup-python@v6
@@ -43,11 +40,8 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'issue_comment' && github.event.issue.pull_request
     steps:
-      - name: Checkout openwisp-utils
+      - name: Checkout repository
         uses: actions/checkout@v6
-        with:
-          repository: Eeshu-Yadav/openwisp-utils
-          ref: issues/571-automate-assigning-unassigning-issues
 
       - name: Set up Python
         uses: actions/setup-python@v6

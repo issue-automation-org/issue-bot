@@ -13,11 +13,8 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event.issue.pull_request == null
     steps:
-      - name: Checkout openwisp-utils
+      - name: Checkout repository
         uses: actions/checkout@v6
-        with:
-          repository: Eeshu-Yadav/openwisp-utils
-          ref: issues/571-automate-assigning-unassigning-issues
 
       - name: Set up Python
         uses: actions/setup-python@v6
