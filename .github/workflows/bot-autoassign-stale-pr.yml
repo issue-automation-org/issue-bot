@@ -14,8 +14,10 @@ jobs:
   manage-stale-prs-python:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
+      - name: Checkout openwisp-utils
         uses: actions/checkout@v6
+        with:
+          repository: openwisp/openwisp-utils
 
       - name: Set up Python
         uses: actions/setup-python@v6
