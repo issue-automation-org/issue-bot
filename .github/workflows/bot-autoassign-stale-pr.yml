@@ -17,7 +17,8 @@ jobs:
       - name: Checkout openwisp-utils
         uses: actions/checkout@v6
         with:
-          repository: openwisp/openwisp-utils
+          repository: Eeshu-Yadav/openwisp-utils
+          ref: issues/571-automate-assigning-unassigning-issues
 
       - name: Set up Python
         uses: actions/setup-python@v6
