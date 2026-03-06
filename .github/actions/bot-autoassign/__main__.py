@@ -1,4 +1,5 @@
 import sys
+import traceback
 
 
 def main():
@@ -32,6 +33,7 @@ def main():
             return 1
     except Exception as e:
         print(f"Error running {bot_type} bot: {e}")
+        traceback.print_exc()
         return 1
 
 

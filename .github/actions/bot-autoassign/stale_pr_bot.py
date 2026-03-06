@@ -2,7 +2,7 @@ import time
 from datetime import datetime, timezone
 
 from base import GitHubBot
-from utils import extract_linked_issues
+from utils import unassign_linked_issues_helper
 
 
 class StalePRBot(GitHubBot):
@@ -22,11 +22,9 @@ class StalePRBot(GitHubBot):
     ):
         if not last_changes_requested:
             return 0
-
         try:
             pr_author = pr.user.login
             last_author_activity = None
-
             commits = list(pr.get_commits()[:50])
             for commit in commits:
                 commit_date = commit.commit.author.date
@@ -37,7 +35,6 @@ class StalePRBot(GitHubBot):
                             or commit_date > last_author_activity
                         ):
                             last_author_activity = commit_date
-
             if issue_comments is None:
                 issue_comments = list(pr.get_issue_comments())
             comments = (
@@ -52,7 +49,6 @@ class StalePRBot(GitHubBot):
                             or comment_date > last_author_activity
                         ):
                             last_author_activity = comment_date
-
             if review_comments is None:
                 review_comments = list(pr.get_review_comments())
             all_review_comments = review_comments
@@ -70,7 +66,6 @@ class StalePRBot(GitHubBot):
                             or comment_date > last_author_activity
                         ):
                             last_author_activity = comment_date
-
             if all_reviews is None:
                 all_reviews = list(pr.get_reviews())
             reviews = all_reviews[-20:] if len(all_reviews) > 20 else all_reviews
@@ -83,13 +78,11 @@ class StalePRBot(GitHubBot):
                             or review_date > last_author_activity
                         ):
                             last_author_activity = review_date
-
             reference_date = last_author_activity or last_changes_requested
             now = datetime.now(timezone.utc)
             return (now - reference_date).days
-
         except Exception as e:
-            print(f"Error calculating activity for PR #{pr.number}: {e}")
+            print("Error calculating activity" f" for PR #{pr.number}: {e}")
             return 0
 
     def get_last_changes_requested(self, pr, all_reviews=None):
@@ -100,23 +93,19 @@ class StalePRBot(GitHubBot):
             changes_requested_reviews = [
                 r for r in reviews if r.state == "CHANGES_REQUESTED"
             ]
-
             if not changes_requested_reviews:
                 return None
-
             changes_requested_reviews.sort(key=lambda r: r.submitted_at, reverse=True)
             return changes_requested_reviews[0].submitted_at
-
         except Exception as e:
-            print(f"Error getting reviews for PR #{pr.number}: {e}")
+            print("Error getting reviews" f" for PR #{pr.number}: {e}")
             return None
 
     def has_bot_comment(self, pr, comment_type, after_date=None, issue_comments=None):
-        """Check if PR already has a specific type of bot comment using HTML markers.
+        """Check if PR already has a specific type of bot comment.
 
-        If ``after_date`` is provided, only considers comments posted
-        after that date. This prevents stale markers from old cycles
-        suppressing new warnings after activity resumes.
+        Uses HTML markers. If ``after_date`` is provided,
+        only considers comments posted after that date.
         """
         try:
             if issue_comments is None:
@@ -133,45 +122,16 @@ class StalePRBot(GitHubBot):
                     return True
             return False
         except Exception as e:
-            print(f"Error checking bot comments for PR #{pr.number}: {e}")
+            print("Error checking bot comments" f" for PR #{pr.number}: {e}")
             return False
 
     def unassign_linked_issues(self, pr):
         try:
-            linked_issues = extract_linked_issues(pr.body or "")
             pr_author = pr.user.login
-            unassigned_count = 0
-
-            for issue_number in linked_issues:
-                try:
-                    issue = self.repo.get_issue(issue_number)
-                    if (
-                        hasattr(issue, "repository")
-                        and issue.repository.full_name != self.repository_name
-                    ):
-                        print(
-                            f"Issue #{issue_number} is from a "
-                            "different repository, skipping"
-                        )
-                        continue
-
-                    if issue.pull_request:
-                        continue
-                    assignees = [
-                        assignee.login
-                        for assignee in issue.assignees
-                        if hasattr(assignee, "login")
-                    ]
-                    if pr_author in assignees:
-                        issue.remove_from_assignees(pr_author)
-                        unassigned_count += 1
-                        print(f"Unassigned {pr_author} from issue #{issue_number}")
-
-                except Exception as e:
-                    print(f"Error unassigning issue #{issue_number}: {e}")
-
-            return unassigned_count
-
+            unassigned_issues = unassign_linked_issues_helper(
+                self.repo, self.repository_name, pr.body or "", pr_author
+            )
+            return len(unassigned_issues)
         except Exception as e:
             print(f"Error processing linked issues for PR #{pr.number}: {e}")
             return 0
@@ -180,52 +140,54 @@ class StalePRBot(GitHubBot):
         if pr.state == "closed":
             print(f"PR #{pr.number} is already closed, skipping")
             return False
-
         try:
             pr_author = pr.user.login
-
             close_lines = [
                 "<!-- bot:closed -->",
                 f"Hi @{pr_author} 👋,",
                 "",
                 (
-                    f"This pull request has been automatically closed due to "
-                    f"**{days_inactive} days of inactivity**. "
-                    "After changes were requested, the PR remained inactive."
+                    "This pull request has been automatically"
+                    " closed due to"
+                    f" **{days_inactive} days of inactivity**."
+                    " After changes were requested,"
+                    " the PR remained inactive."
                 ),
                 "",
                 (
-                    "We understand that life gets busy, and we appreciate "
-                    "your initial contribution! 💙"
+                    "We understand that life gets busy,"
+                    " and we appreciate your initial"
+                    " contribution! 💙"
                 ),
                 "",
-                "**The door is always open** for you to come back:",
+                ("**The door is always open**" " for you to come back:"),
                 (
-                    "- You can **reopen this PR** at any time "
-                    "if you'd like to continue working on it"
+                    "- You can **reopen this PR** at any time"
+                    " if you'd like to continue working on it"
                 ),
-                "- Feel free to push new commits addressing the requested changes",
-                "- If you reopen the PR, the linked issue will be reassigned to you",
+                ("- Feel free to push new commits" " addressing the requested changes"),
+                (
+                    "- If you reopen the PR, the linked issue"
+                    " will be reassigned to you"
+                ),
                 "",
                 (
-                    "If you have any questions or need help, "
-                    "don't hesitate to reach out. We're here to support you!"
+                    "If you have any questions or need help,"
+                    " don't hesitate to reach out."
+                    " We're here to support you!"
                 ),
                 "",
-                "Thank you for your interest in contributing to OpenWISP! 🙏",
+                ("Thank you for your interest in" " contributing to OpenWISP! 🙏"),
             ]
-
-            pr.edit(state="closed")
             pr.create_issue_comment("\n".join(close_lines))
-
+            pr.edit(state="closed")
             unassigned_count = self.unassign_linked_issues(pr)
             print(
-                f"Closed PR #{pr.number} after {days_inactive} days of "
-                f"inactivity, unassigned {unassigned_count} issues"
+                f"Closed PR #{pr.number} after"
+                f" {days_inactive} days of inactivity,"
+                f" unassigned {unassigned_count} issues"
             )
-
             return True
-
         except Exception as e:
             print(f"Error closing PR #{pr.number}: {e}")
             return False
@@ -233,121 +195,121 @@ class StalePRBot(GitHubBot):
     def mark_pr_stale(self, pr, days_inactive):
         try:
             pr_author = pr.user.login
-
             unassign_lines = [
                 "<!-- bot:stale -->",
                 f"Hi @{pr_author} 👋,",
                 "",
                 (
-                    f"This pull request has been marked as **stale** due to "
-                    f"**{days_inactive} days of inactivity** after changes "
-                    "were requested."
+                    "This pull request has been marked"
+                    " as **stale** due to"
+                    f" **{days_inactive} days of inactivity**"
+                    " after changes were requested."
                 ),
                 "",
                 (
-                    "As a result, **the linked issue(s) have been "
-                    "unassigned** from you to allow other contributors "
-                    "to work on it."
+                    "As a result, **the linked issue(s)"
+                    " have been unassigned** from you"
+                    " to allow other contributors"
+                    " to work on it."
                 ),
                 "",
                 (
-                    "However, **you can still continue working on this PR**! "
-                    "If you push new commits or respond to the review feedback:"
+                    "However, **you can still continue"
+                    " working on this PR**!"
+                    " If you push new commits or respond"
+                    " to the review feedback:"
                 ),
                 "- The issue will be reassigned to you",
                 "- Your contribution is still very welcome",
                 "",
                 (
-                    "If you need more time or have questions about the "
-                    "requested changes, please let us know. "
-                    "We're happy to help! 🤝"
+                    "If you need more time or have questions"
+                    " about the requested changes, please"
+                    " let us know."
+                    " We're happy to help! 🤝"
                 ),
                 "",
                 (
-                    f"If there's no further activity within "
-                    f"**{self.DAYS_BEFORE_CLOSE - days_inactive} "
-                    "more days**, this PR will be automatically closed "
-                    "(but can be reopened anytime)."
+                    "If there's no further activity within"
+                    f" **{self.DAYS_BEFORE_CLOSE - days_inactive}"
+                    " more days**, this PR will be"
+                    " automatically closed"
+                    " (but can be reopened anytime)."
                 ),
             ]
-
             pr.create_issue_comment("\n".join(unassign_lines))
-
             unassigned_count = self.unassign_linked_issues(pr)
             try:
                 pr.add_to_labels("stale")
             except Exception as e:
                 print(f"Could not add stale label: {e}")
-
             print(
-                f"Marked PR #{pr.number} as stale after {days_inactive} "
-                f"days, unassigned {unassigned_count} issues"
+                f"Marked PR #{pr.number} as stale after"
+                f" {days_inactive} days,"
+                f" unassigned {unassigned_count} issues"
             )
             return True
-
         except Exception as e:
-            print(f"Error marking PR #{pr.number} as stale: {e}")
+            print(f"Error marking PR #{pr.number}" f" as stale: {e}")
             return False
 
     def send_stale_warning(self, pr, days_inactive):
         try:
             pr_author = pr.user.login
-
             remaining = self.DAYS_BEFORE_UNASSIGN - days_inactive
-
             warning_lines = [
                 "<!-- bot:stale_warning -->",
                 f"Hi @{pr_author} 👋,",
                 "",
                 (
-                    "This is a friendly reminder that this pull request "
-                    f"has had **no activity for {days_inactive} days** "
-                    "since changes were requested."
+                    "This is a friendly reminder that"
+                    " this pull request has had"
+                    f" **no activity for {days_inactive}"
+                    " days** since changes were requested."
                 ),
                 "",
                 (
-                    "We'd love to see this contribution merged! "
-                    "Please take a moment to:"
+                    "We'd love to see this contribution"
+                    " merged! Please take a moment to:"
                 ),
                 "- Address the review feedback",
                 "- Push your changes",
-                "- Let us know if you have any questions or need clarification",
+                ("- Let us know if you have any questions" " or need clarification"),
                 "",
                 (
-                    "If you're busy or need more time, no worries! "
-                    "Just leave a comment to let us know "
-                    "you're still working on it."
+                    "If you're busy or need more time,"
+                    " no worries! Just leave a comment"
+                    " to let us know you're still"
+                    " working on it."
                 ),
                 "",
                 (
-                    f"**Note:** within **{remaining} more days**, "
-                    "the linked issue will be unassigned to allow "
-                    "other contributors to work on it."
+                    f"**Note:** within"
+                    f" **{remaining} more days**,"
+                    " the linked issue will be unassigned"
+                    " to allow other contributors"
+                    " to work on it."
                 ),
                 "",
                 "Thank you for your contribution! 🙏",
             ]
-
             pr.create_issue_comment("\n".join(warning_lines))
             print(f"Sent stale warning for PR #{pr.number}")
             return True
-
         except Exception as e:
-            print(f"Error sending warning for PR #{pr.number}: {e}")
+            print("Error sending warning" f" for PR #{pr.number}: {e}")
             return False
 
     def process_stale_prs(self):
         if not self.repo:
             print("GitHub repository not initialized")
-            return
-
+            return False
         try:
             open_prs = self.repo.get_pulls(state="open")
-            print(f"Found {open_prs.totalCount} open pull requests")
-
             processed_count = 0
-
+            pr_count = 0
             for pr in open_prs:
+                pr_count += 1
                 try:
                     all_reviews = list(pr.get_reviews())
                     last_changes_requested = self.get_last_changes_requested(
@@ -355,10 +317,8 @@ class StalePRBot(GitHubBot):
                     )
                     if not last_changes_requested:
                         continue
-
                     issue_comments = list(pr.get_issue_comments())
                     review_comments = list(pr.get_review_comments())
-
                     days_inactive = self.get_days_since_activity(
                         pr,
                         last_changes_requested,
@@ -367,13 +327,12 @@ class StalePRBot(GitHubBot):
                         review_comments,
                     )
                     print(
-                        f"PR #{pr.number}: {days_inactive} days "
-                        "since contributor activity"
+                        f"PR #{pr.number}: {days_inactive}"
+                        " days since contributor activity"
                     )
                     if days_inactive >= self.DAYS_BEFORE_CLOSE:
                         if self.close_stale_pr(pr, days_inactive):
                             processed_count += 1
-
                     elif days_inactive >= self.DAYS_BEFORE_UNASSIGN:
                         if not self.has_bot_comment(
                             pr,
@@ -383,7 +342,6 @@ class StalePRBot(GitHubBot):
                         ):
                             if self.mark_pr_stale(pr, days_inactive):
                                 processed_count += 1
-
                     elif days_inactive >= self.DAYS_BEFORE_STALE_WARNING:
                         if not self.has_bot_comment(
                             pr,
@@ -393,28 +351,26 @@ class StalePRBot(GitHubBot):
                         ):
                             if self.send_stale_warning(pr, days_inactive):
                                 processed_count += 1
-
-                    time.sleep(0.1)
-
+                    time.sleep(0.5)
                 except Exception as e:
-                    print(f"Error processing PR #{pr.number}: {e}")
+                    print(f"Error processing" f" PR #{pr.number}: {e}")
                     continue
-
-            print(f"Processed {processed_count} stale PRs")
-
+            print(
+                f"Checked {pr_count} open PRs,"
+                f" processed {processed_count} stale PRs"
+            )
+            return True
         except Exception as e:
             print(f"Error in process_stale_prs: {e}")
+            return False
 
     def run(self):
         if not self.github or not self.repo:
-            print("GitHub client not properly initialized, cannot proceed")
+            print("GitHub client not properly initialized," " cannot proceed")
             return False
-
         print("Stale PR Management Bot starting...")
-
         try:
-            self.process_stale_prs()
-            return True
+            return self.process_stale_prs()
         except Exception as e:
             print(f"Error in main execution: {e}")
             return False
