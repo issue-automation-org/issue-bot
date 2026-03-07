@@ -18,6 +18,13 @@ jobs:
   manage-stale-prs-python:
     runs-on: ubuntu-latest
     steps:
+      - name: Generate GitHub App token
+        id: generate-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.OPENWISP_BOT_APP_ID }}
+          private-key: ${{ secrets.OPENWISP_BOT_PRIVATE_KEY }}
+
       - name: Checkout repository
         uses: actions/checkout@v6
 
@@ -27,12 +34,14 @@ jobs:
           python-version: "3.13"
 
       - name: Install dependencies
-        run: pip install PyGithub
+        run: pip install -e .[github_actions]
 
       - name: Run stale PR bot
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ steps.generate-token.outputs.token }}
           REPOSITORY: ${{ github.repository }}
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          PYTHONPATH: .github/actions
         run: >
-          python .github/actions/bot-autoassign/__main__.py
+          python -m bot_autoassign
           stale_pr
